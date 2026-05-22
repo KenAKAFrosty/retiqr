@@ -5,9 +5,9 @@ Some places have internet but won't give it to you. Hotel lobbies, library termi
 retiqr fixes that. Point a camera at the screen and plug in your virtual keyboard to the USB port. The kiosk becomes a Reticulum relay.
 
 **Downlink (kiosk → you):** the browser renders animated QR codes; your camera reads them  
-**Uplink (you → kiosk):** your device types HID keystrokes into a hidden input on the page
+**Uplink (you → kiosk):** a thumb-drive sized Bluetooth dongle plugged into the kiosk USB port types keystrokes into the page
 
-No drivers. No network join. Just a USB port and a screen.
+Typical throughput: ~3 kB/s down (QR), ~500 B/s up (HID). Enough for messaging and Nomad Network.
 
 ## Components
 
@@ -35,3 +35,16 @@ Reticulum stack     ← your apps: Sideband, NomadNet, etc.
 ```
 
 The gateway is protocol-blind — it splices bytes without knowing anything about Reticulum. All the intelligence is on your device.
+
+## Status
+
+| Uplink path | Announces | Messaging | NomadNet |
+|-------------|-----------|-----------|----------|
+| Laptop + ESP32-S3 BLE dongle | yes | yes | yes |
+| Pi Zero USB HID gadget | untested | untested | untested |
+
+The Pi Zero gadget path (`--uplink gadget`) is implemented but has not been tested on hardware. Contributions welcome.
+
+## Notes
+
+Built with AI assistance (Claude).
