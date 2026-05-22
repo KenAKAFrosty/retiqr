@@ -1,4 +1,4 @@
-# retiqr — Reticulum QR Interface
+# retiqr — An alternative reticulum QR+HID interface
 
 Some places have internet but won't give it to you. Hotel lobbies, library terminals, car dashboards, airport kiosks — a browser is right there, but there's no open WiFi, no ethernet port, no way to get your device online.
 
@@ -42,6 +42,7 @@ The gateway is protocol-blind — it splices bytes without knowing anything abou
 
 The Pi Zero gadget path (`--uplink gadget`) is implemented but has not been tested on hardware. Contributions welcome.
 
-## Notes
+## AI disclosure
 
-Built with AI assistance (Claude).
+I am a developer by profession (10+ years).  
+This repo was built with AI assistance (Claude).
