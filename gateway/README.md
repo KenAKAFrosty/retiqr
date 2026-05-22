@@ -2,6 +2,10 @@
 
 aiohttp server that serves the kiosk web page and splices WebSocket ↔ Reticulum TCP. Protocol-blind — no Reticulum knowledge required.
 
+![Gateway web UI](../docs/webui.png)
+
+*The kiosk page mid-session: a QR code carrying a downlink packet fills the main area, with the RX stream growing upward and TX stream growing downward in the sidebar.*
+
 ## Running
 
 ```bash

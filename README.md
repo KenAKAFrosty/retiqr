@@ -10,10 +10,6 @@ Typical throughput: ~3 kB/s down (QR), ~500 B/s up (HID). Enough for messaging a
 
 *The client app viewfinder pointed at a laptop running the gateway page. The ESP32 BLE dongle is visible bottom-left, plugged into the kiosk USB port. Status bar confirms Reticulum connected with an active BLE link.*
 
-![Gateway web UI](docs/webui.png)
-
-*The kiosk page mid-session: a QR code carrying a downlink packet fills the main area, with the RX stream growing upward and TX stream growing downward in the sidebar.*
-
 ## Components
 
 | Directory | Description |
