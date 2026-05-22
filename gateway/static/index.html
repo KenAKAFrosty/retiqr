@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Reticulum Gateway</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #0a0a0a;
+      color: #ccc;
+      font: 12px/1.4 monospace;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    #status-bar {
+      display: flex;
+      gap: 20px;
+      align-items: center;
+      padding: 6px 14px;
+      background: #161616;
+      border-bottom: 1px solid #222;
+      flex-shrink: 0;
+    }
+
+    .indicator {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #444;
+      transition: background 0.3s;
+    }
+    .dot.on  { background: #4c4; }
+    .dot.err { background: #c44; }
+
+    #qr-area {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: default;
+    }
+
+    #qr-canvas {
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+      max-width: 100%;
+      max-height: 100%;
+    }
+
+    #idle-msg {
+      position: absolute;
+      color: #333;
+      font-size: 14px;
+      text-align: center;
+      pointer-events: none;
+    }
+
+    /* Invisible but focusable input — positioned off-screen rather than
+       display:none so kiosk browsers still allow focus */
+    #hid-input {
+      position: fixed;
+      left: -9999px;
+      top: 0;
+      width: 1px;
+      height: 1px;
+      opacity: 0;
+    }
+  </style>
+</head>
+<body>
+
+<div id="status-bar">
+  <div class="indicator">
+    <div class="dot" id="ws-dot"></div>
+    <span id="ws-text">connecting</span>
+  </div>
+  <div class="indicator">
+    <div class="dot" id="rx-dot"></div>
+    <span>RX <span id="rx-count">0</span></span>
+  </div>
+  <div class="indicator">
+    <div class="dot" id="tx-dot"></div>
+    <span>TX <span id="tx-count">0</span></span>
+  </div>
+  <span>queue <span id="queue-len">0</span></span>
+  <span style="margin-left:auto; color:#555" id="seq-disp">seq —</span>
+</div>
+
+<div id="qr-area">
+  <canvas id="qr-canvas"></canvas>
+  <div id="idle-msg">waiting for data…</div>
+</div>
+
+<!-- Always-focused sink for HID keyboard input -->
+<input id="hid-input"
+       type="text"
+       autocomplete="off"
+       autocorrect="off"
+       autocapitalize="off"
+       spellcheck="false"
+       tabindex="0"
+       aria-hidden="true">
+
+<!-- qrcode-generator (kazuhikoarase). Byte mode, no UTF-8 re-encoding. -->
+<script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.min.js"></script>
+
+<script>
+"use strict";
+
+// ─── HDLC (Reticulum TCP interface framing) ──────────────────────────────────
+
+// Parse a raw byte stream, emit complete packets (without flag bytes).
+class HdlcParser {
+  constructor(onPacket) {
+    this._buf = [];
+    this._esc = false;
+    this._cb  = onPacket;
+  }
+  push(bytes) {
+    for (const b of bytes) {
+      if (b === 0x7e) {
+        if (this._buf.length) this._cb(new Uint8Array(this._buf));
+        this._buf = [];
+        this._esc = false;
+      } else if (b === 0x7d) {
+        this._esc = true;
+      } else {
+        this._buf.push(this._esc ? b ^ 0x20 : b);
+        this._esc = false;
+      }
+    }
+  }
+}
+
+// Wrap raw packet bytes in HDLC framing for sending over TCP.
+function hdlcEncode(data) {
+  const out = [0x7e];
+  for (const b of data) {
+    if (b === 0x7e || b === 0x7d) { out.push(0x7d, b ^ 0x20); }
+    else                           { out.push(b); }
+  }
+  out.push(0x7e);
+  return new Uint8Array(out);
+}
+
+// ─── HID uplink frame parser ──────────────────────────────────────────────────
+//
+// Pi Zero types:  >HEXHEXHEX CC<
+//   HEXHEX…  = packet bytes as uppercase hex
+//   CC       = XOR checksum of all packet bytes, 2 hex chars
+//   >  <     = frame delimiters (safe on all keyboard layouts alongside hex charset)
+
+class HidParser {
+  constructor(onPacket) {
+    this._buf = '';
+    this._cb  = onPacket;
+  }
+  push(chars) {
+    this._buf += chars;
+    if (this._buf.length > 4096) this._buf = this._buf.slice(-2048); // overflow guard
+    let s, e;
+    while ((s = this._buf.indexOf('>')) !== -1 &&
+           (e = this._buf.indexOf('<', s + 1)) !== -1) {
+      const content = this._buf.slice(s + 1, e);
+      this._buf = this._buf.slice(e + 1);
+      this._decode(content);
+    }
+  }
+  _decode(hex) {
+    hex = hex.toUpperCase().replace(/[^0-9A-F]/g, '');
+    if (hex.length < 4 || hex.length % 2 !== 0) return;
+
+    const crcHex  = hex.slice(-2);
+    const dataHex = hex.slice(0, -2);
+    const data    = new Uint8Array(dataHex.length / 2);
+
+    for (let i = 0; i < data.length; i++)
+      data[i] = parseInt(dataHex.slice(i * 2, i * 2 + 2), 16);
+
+    let crc = 0;
+    for (const b of data) crc ^= b;
+
+    if (crc === parseInt(crcHex, 16)) this._cb(data);
+  }
+}
+
+// ─── QR display ──────────────────────────────────────────────────────────────
+
+const canvas  = document.getElementById('qr-canvas');
+const ctx     = canvas.getContext('2d');
+const idleMsg = document.getElementById('idle-msg');
+const qrArea  = document.getElementById('qr-area');
+
+function sizeCanvas() {
+  const w = qrArea.clientWidth  - 20;
+  const h = qrArea.clientHeight - 20;
+  const dim = Math.min(w, h);
+  canvas.style.width  = dim + 'px';
+  canvas.style.height = dim + 'px';
+}
+sizeCanvas();
+window.addEventListener('resize', sizeCanvas);
+
+// Render a Uint8Array to the canvas as a QR code (binary / Byte mode).
+function renderQR(data) {
+  const str = Array.from(data, b => String.fromCharCode(b)).join('');
+
+  const qr = qrcode(0, 'M');   // auto version, medium ECC
+  qr.addData(str, 'Byte');
+  qr.make();
+
+  const n     = qr.getModuleCount();
+  const dim   = parseInt(canvas.style.width);  // CSS pixels
+  const QUIET = 4;                              // QR spec minimum quiet zone (modules)
+  const cell  = dim / (n + 2 * QUIET);
+
+  if (canvas.width !== dim || canvas.height !== dim) {
+    canvas.width  = dim;
+    canvas.height = dim;
+  }
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, dim, dim);
+  ctx.fillStyle = '#000000';
+
+  for (let r = 0; r < n; r++)
+    for (let c = 0; c < n; c++)
+      if (qr.isDark(r, c))
+        ctx.fillRect(Math.floor((c + QUIET) * cell), Math.floor((r + QUIET) * cell),
+                     Math.ceil(cell), Math.ceil(cell));
+
+  idleMsg.style.display = 'none';
+}
+
+function showIdle() {
+  idleMsg.style.display = '';
+  ctx.fillStyle = '#0a0a0a';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+// ─── Packet queue and display loop ───────────────────────────────────────────
+
+const queue       = [];
+let   txSeq       = 0;
+let   idle        = true;
+const FRAME_MS    = 200;   // ms per QR frame — tune to camera decode speed
+const MAX_QR_CHUNK = 80;   // max packet bytes per QR frame (matches framing.py)
+
+function enqueuePacket(packet) {
+  const chunks = [];
+  if (packet.length === 0) {
+    chunks.push(new Uint8Array(0));
+  } else {
+    for (let i = 0; i < packet.length; i += MAX_QR_CHUNK)
+      chunks.push(packet.slice(i, i + MAX_QR_CHUNK));
+  }
+  const total = chunks.length;
+  const seq   = txSeq;
+  txSeq = (txSeq + 1) & 0xffff;
+  chunks.forEach((chunk, idx) => {
+    const frame = new Uint8Array(4 + chunk.length);
+    frame[0] = (seq >> 8) & 0xff;
+    frame[1] =  seq       & 0xff;
+    frame[2] = total;
+    frame[3] = idx;
+    frame.set(chunk, 4);
+    queue.push(frame);
+  });
+}
+
+setInterval(() => {
+  if (queue.length > 0) {
+    renderQR(queue.shift());
+    blink(rxDot);
+    idle = false;
+  } else if (!idle) {
+    showIdle();
+    idle = true;
+  }
+  updateUI();
+}, FRAME_MS);
+
+// ─── WebSocket ───────────────────────────────────────────────────────────────
+
+let ws       = null;
+let rxCount  = 0;
+let txCount  = 0;
+const hdlc   = new HdlcParser(pkt => { rxCount++; enqueuePacket(pkt); });
+
+function connect() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/ws`);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onopen  = () => setWsStatus('connected', true);
+  ws.onclose = () => { setWsStatus('offline', false); setTimeout(connect, 2500); };
+  ws.onerror = () => ws.close();
+  ws.onmessage = e => hdlc.push(new Uint8Array(e.data));
+}
+
+connect();
+
+// ─── HID uplink ──────────────────────────────────────────────────────────────
+
+const hidInput = document.getElementById('hid-input');
+const hid      = new HidParser(pkt => {
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(hdlcEncode(pkt));
+    txCount++;
+    blink(txDot);
+  }
+});
+
+hidInput.addEventListener('input', () => {
+  hid.push(hidInput.value);
+  hidInput.value = '';
+});
+
+// Keep focus on the input so HID keystrokes are always captured.
+function refocus() { if (document.activeElement !== hidInput) hidInput.focus(); }
+setInterval(refocus, 250);
+document.addEventListener('click', refocus);
+document.addEventListener('touchstart', refocus);
+
+// ─── UI helpers ──────────────────────────────────────────────────────────────
+
+const wsDot   = document.getElementById('ws-dot');
+const wsText  = document.getElementById('ws-text');
+const rxDot   = document.getElementById('rx-dot');
+const txDot   = document.getElementById('tx-dot');
+const rxEl    = document.getElementById('rx-count');
+const txEl    = document.getElementById('tx-count');
+const queueEl = document.getElementById('queue-len');
+const seqEl   = document.getElementById('seq-disp');
+
+function setWsStatus(text, ok) {
+  wsText.textContent = text;
+  wsDot.className    = 'dot' + (ok ? ' on' : ' err');
+}
+
+function updateUI() {
+  rxEl.textContent    = rxCount;
+  txEl.textContent    = txCount;
+  queueEl.textContent = queue.length;
+  seqEl.textContent   = 'seq ' + txSeq.toString(16).padStart(4, '0');
+}
+
+const blinkTimers = new Map();
+function blink(el) {
+  el.classList.add('on');
+  clearTimeout(blinkTimers.get(el));
+  blinkTimers.set(el, setTimeout(() => { el.classList.remove('on'); blinkTimers.delete(el); }, 120));
+}
+</script>
+</body>
+</html>

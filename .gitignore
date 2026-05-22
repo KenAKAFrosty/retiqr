@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+*.egg-info/
+.pytest_cache/
+.DS_Store
+
+# PlatformIO
+firmware/.pio/build/
+firmware/.pio/libdeps/
+
+# Claude Code
+.claude/settings.local.json
+
+# IDE
+.vscode/
+.idea/
