@@ -43,6 +43,12 @@
     .dot.on  { background: #4c4; }
     .dot.err { background: #c44; }
 
+    #main {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+
     #qr-area {
       flex: 1;
       display: flex;
@@ -65,6 +71,86 @@
       font-size: 14px;
       text-align: center;
       pointer-events: none;
+    }
+
+    /* ── sidebar ── */
+    #sidebar {
+      width: 160px;
+      flex-shrink: 0;
+      border-left: 1px solid #1e1e1e;
+      display: flex;
+      flex-direction: column;
+      background: #0e0e0e;
+    }
+
+    #rx-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      overflow: hidden;
+    }
+
+    #sidebar-label {
+      display: flex;
+      justify-content: space-between;
+      padding: 5px 8px;
+      font-size: 10px;
+      letter-spacing: 0.08em;
+      color: #444;
+      border-top: 1px solid #1e1e1e;
+      border-bottom: 1px solid #1e1e1e;
+      flex-shrink: 0;
+    }
+
+    #tx-panel {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      overflow: hidden;
+    }
+
+    .stream-events {
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      padding: 4px 0;
+    }
+
+    .stream-event {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      padding: 2px 8px;
+      opacity: 1;
+      transition: opacity 2s ease;
+    }
+
+
+    .event-bar-bg {
+      flex: 1;
+      height: 6px;
+      background: #1a1a1a;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .event-bar {
+      height: 100%;
+      border-radius: 2px;
+      min-width: 2px;
+    }
+
+    .rx-bar  { background: #2a6; }
+    .tx-bar  { background: #26a; }
+
+    .event-size {
+      font-size: 9px;
+      color: #444;
+      width: 30px;
+      text-align: right;
+      flex-shrink: 0;
     }
 
     /* Invisible but focusable input — positioned off-screen rather than
@@ -98,9 +184,24 @@
   <span style="margin-left:auto; color:#555" id="seq-disp">seq —</span>
 </div>
 
-<div id="qr-area">
-  <canvas id="qr-canvas"></canvas>
-  <div id="idle-msg">waiting for data…</div>
+<div id="main">
+  <div id="qr-area">
+    <canvas id="qr-canvas"></canvas>
+    <div id="idle-msg">waiting for data…</div>
+  </div>
+
+  <div id="sidebar">
+    <div id="rx-panel">
+      <div class="stream-events" id="rx-events"></div>
+    </div>
+    <div id="sidebar-label">
+      <span>RX ↑</span>
+      <span>TX ↓</span>
+    </div>
+    <div id="tx-panel">
+      <div class="stream-events" id="tx-events"></div>
+    </div>
+  </div>
 </div>
 
 <!-- Always-focused sink for HID keyboard input -->
@@ -230,9 +331,9 @@ function renderQR(data) {
     canvas.width  = dim;
     canvas.height = dim;
   }
-  ctx.fillStyle = '#ffffff';
+  ctx.fillStyle = '#0a0a0a';
   ctx.fillRect(0, 0, dim, dim);
-  ctx.fillStyle = '#000000';
+  ctx.fillStyle = '#ffffff';
 
   for (let r = 0; r < n; r++)
     for (let c = 0; c < n; c++)
@@ -247,6 +348,37 @@ function showIdle() {
   idleMsg.style.display = '';
   ctx.fillStyle = '#0a0a0a';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+}
+
+// ─── Sidebar stream panels ────────────────────────────────────────────────────
+
+const MAX_EVENTS  = 20;   // rows kept in the DOM per panel
+const MAX_BYTES   = 500;  // packet size that fills the bar 100%
+
+// rx: append (newest at bottom, closest to center label, grows upward)
+// tx: prepend (newest at top, closest to center label, grows downward)
+function addEvent(containerId, bytes, barClass) {
+  const container = document.getElementById(containerId);
+  const isRx      = containerId === 'rx-events';
+  const pct       = Math.min(100, Math.round(bytes / MAX_BYTES * 100));
+  const label     = bytes >= 1024
+    ? (bytes / 1024).toFixed(1) + 'k'
+    : bytes + 'B';
+
+  const el = document.createElement('div');
+  el.className = 'stream-event';
+  el.innerHTML =
+    `<div class="event-bar-bg"><div class="event-bar ${barClass}" style="width:${pct}%"></div></div>` +
+    `<div class="event-size">${label}</div>`;
+
+  if (isRx) container.append(el);
+  else       container.prepend(el);
+
+  const events = container.querySelectorAll('.stream-event');
+  events.forEach((e, i) => {
+    const age = isRx ? events.length - 1 - i : i;
+    if (age >= MAX_EVENTS) e.remove();
+  });
 }
 
 // ─── Packet queue and display loop ───────────────────────────────────────────
@@ -291,12 +423,25 @@ setInterval(() => {
   updateUI();
 }, FRAME_MS);
 
+setInterval(() => {
+  addEvent('rx-events', pendingRxBytes, 'rx-bar');
+  addEvent('tx-events', pendingTxBytes, 'tx-bar');
+  pendingRxBytes = 0;
+  pendingTxBytes = 0;
+}, 1000);
+
 // ─── WebSocket ───────────────────────────────────────────────────────────────
 
 let ws       = null;
 let rxCount  = 0;
 let txCount  = 0;
-const hdlc   = new HdlcParser(pkt => { rxCount++; enqueuePacket(pkt); });
+let pendingRxBytes = 0;
+let pendingTxBytes = 0;
+const hdlc   = new HdlcParser(pkt => {
+  rxCount++;
+  enqueuePacket(pkt);
+  pendingRxBytes += pkt.length;
+});
 
 function connect() {
   const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -319,6 +464,7 @@ const hid      = new HidParser(pkt => {
     ws.send(hdlcEncode(pkt));
     txCount++;
     blink(txDot);
+    pendingTxBytes += pkt.length;
   }
 });
 

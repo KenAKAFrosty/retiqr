@@ -6,6 +6,10 @@ retiqr fixes that. Navigate to the retiqr website on the kiosk browser — it re
 
 Typical throughput: ~3 kB/s down (QR), ~500 B/s up (HID). Enough for messaging and Nomad Network.
 
+![Client app in action](docs/demo.png)
+
+*The client app viewfinder pointed at a laptop running the gateway page. The ESP32 BLE dongle is visible bottom-left, plugged into the kiosk USB port. Status bar confirms Reticulum connected with an active BLE link.*
+
 ## Components
 
 | Directory | Description |
