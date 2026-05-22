@@ -2,7 +2,9 @@
 
 Some places have internet but won't give it to you. Hotel lobbies, library terminals, car dashboards, airport kiosks — a browser is right there, but there's no open WiFi, no ethernet port, no way to get your device online.
 
-retiqr fixes that. Point a camera at the screen and plug in your virtual keyboard to the USB port. The kiosk becomes a Reticulum relay.
+retiqr fixes that. A small Python app on your machine reads the camera feed to decode incoming QR data, sends outgoing traffic via HID, and exposes a local TCP server that Reticulum connects to as a standard TCPClientInterface.
+
+Point a camera at the screen and plug in your virtual keyboard to the USB port. The kiosk becomes a Reticulum relay.
 
 **Downlink (kiosk → you):** the browser renders animated QR codes; your camera reads them  
 **Uplink (you → kiosk):** a thumb-drive sized Bluetooth dongle plugged into the kiosk USB port types keystrokes into the page
