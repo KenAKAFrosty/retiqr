@@ -14,12 +14,12 @@ Typical throughput: ~3 kB/s down (QR), ~500 B/s up (HID). Enough for messaging a
 
 | Directory | Description |
 |-----------|-------------|
-| `gateway/` | Server-side: aiohttp app that serves the kiosk page and splices WebSocket ↔ Reticulum TCP |
-| `client/` | Your-side: desktop app (Mac/Linux/Pi Zero) — webcam QR decode + BLE/HID uplink + Reticulum TCP bridge |
-| `firmware/` | ESP32-S3 (M5Stack AtomS3 Lite) BLE → USB HID keyboard dongle for the laptop uplink path |
+| [`gateway/`](gateway/README.md) | Server-side: aiohttp app that serves the kiosk page and splices WebSocket ↔ Reticulum TCP |
+| [`client/`](client/README.md) | Your-side: desktop app (Mac/Linux/Pi Zero) — webcam QR decode + BLE/HID uplink + Reticulum TCP bridge |
+| [`firmware/`](firmware/README.md) | ESP32-S3 (M5Stack AtomS3 Lite) BLE → USB HID keyboard dongle for the laptop uplink path |
 | `shared/` | `framing.py` — HDLC, HID, and QR wire format shared by gateway and client |
 
-See each component's `README.md` for setup and usage details.
+See each component's README for setup and usage details.
 
 ## How it works
 
