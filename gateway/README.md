@@ -19,6 +19,21 @@ python gateway.py --target-host <reticulum-node> --target-port 4242
 | `--port` | `8080` | Listen port |
 | `--log-level` | `INFO` | `DEBUG`, `INFO`, `WARNING` |
 
+## Docker
+
+Build and run from the **repo root** (the build context needs access to `shared/framing.py`):
+
+```bash
+docker build -f gateway/Dockerfile -t retiqr-gateway .
+docker run -p 8080:8080 retiqr-gateway --target-host <reticulum-node> --target-port 4242
+```
+
+Or with Docker Compose — edit `target-host` in `docker-compose.yml` first:
+
+```bash
+docker compose -f gateway/docker-compose.yml up
+```
+
 ## Testing
 
 ```bash

@@ -1,0 +1,13 @@
+services:
+  gateway:
+    build:
+      context: ..          # repo root — needed to reach shared/framing.py
+      dockerfile: gateway/Dockerfile
+    ports:
+      - "8080:8080"
+    command:
+      - "--target-host"
+      - "reticulum-node"   # replace with your Reticulum node host
+      - "--target-port"
+      - "4242"
+    restart: unless-stopped
