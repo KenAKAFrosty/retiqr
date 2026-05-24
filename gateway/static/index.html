@@ -816,11 +816,11 @@ function connect() {
 
 connect();
 
-// ─── HID uplink (legacy: textarea keystroke capture) ─────────────────────────
+// ─── HID uplink (standard: textarea keystroke capture) ───────────────────────
 
 const hidInput = document.getElementById('hid-input');
 const hid      = new HidParser(pkt => {
-  // Suppress legacy parse path entirely when fast-path is active. If the
+  // Suppress standard parse path entirely when fast-path is active. If the
   // dongle is still typing leftover keystrokes during a transition, dropping
   // them here is correct — those bytes are already coming in via WebHID.
   if (transport) return;
@@ -1135,7 +1135,7 @@ function setFastMode(active, device) {
     webhidDevice.textContent = device ? device.productName || 'HID device' : '—';
     webhidStats.textContent  = 'measuring…';
     setPeerControlsEnabled(true);
-    // Drain any QR queue so the legacy path doesn't keep displaying.
+    // Drain any QR queue so the standard path doesn't keep displaying.
     queue.length = 0;
   } else {
     webhidArea.classList.remove('active');
@@ -1160,7 +1160,7 @@ function attachFastTransport(nextTransport) {
   refreshPeerConfigUi(nextTransport);
   nextTransport.device.addEventListener('disconnect', () => {
     if (transport !== nextTransport) return;
-    console.warn('[webhid] device disconnected — falling back to legacy');
+    console.warn('[webhid] device disconnected — falling back to standard');
     transport = null;
     setFastMode(false);
   });
@@ -1168,7 +1168,7 @@ function attachFastTransport(nextTransport) {
 
 async function connectFastPath() {
   if (transport) {
-    // Toggle off — disconnect, fall back to legacy
+    // Toggle off — disconnect, fall back to standard
     const t = transport;
     transport = null;
     setFastMode(false);

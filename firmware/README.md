@@ -39,7 +39,7 @@ Connect a 3.3 V UART adapter to G5/G6 at 115200 baud to see debug output.
 |--------|-------|
 | Yellow pulse | Scanning (no BLE connection) |
 | Blue | Connected, idle |
-| Green | Typing (legacy path) |
+| Green | Typing (standard path) |
 
 ## Button
 
@@ -52,7 +52,7 @@ UUIDs must match `client/tx/ble.py` exactly.
 | | UUID | Properties | Use |
 |-|------|------------|-----|
 | Service | `4b696f73-6b55-0001-0000-000000000000` | | — |
-| TX char | `4b696f73-6b55-0002-0000-000000000000` | WRITE_NR | Legacy: ASCII bytes typed as keystrokes |
+| TX char | `4b696f73-6b55-0002-0000-000000000000` | WRITE_NR | Standard: ASCII bytes typed as keystrokes |
 | CFG char | `4b696f73-6b55-0003-0000-000000000000` | WRITE | 2-byte big-endian inter-keystroke delay (clamped to [1, 100] ms) |
 | WHID-RX | `4b696f73-6b55-0004-0000-000000000000` | NOTIFY | Fast: vendor-HID Output Report payloads forwarded to laptop |
 | WHID-TX | `4b696f73-6b55-0005-0000-000000000000` | WRITE_NR | Fast: vendor-HID Input Reports (1 length byte + ≤62 payload), chunked by the client to fit the negotiated BLE MTU |

@@ -40,7 +40,7 @@ class KioskApp:
         self._bridge_port = bridge_port
         self._camera_device = camera_device
         self._uplink = uplink
-        self._mode = mode  # "legacy" (camera+keyboard) or "webhid" (vendor HID)
+        self._mode = mode  # "legacy" (the standard camera+keyboard path) or "webhid" (vendor HID)
 
     def run(self):
         import sys

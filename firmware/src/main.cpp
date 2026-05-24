@@ -4,7 +4,7 @@
  * Target: M5Stack AtomS3 Lite (ESP32-S3FN8)
  *
  * Two USB HID interfaces are exposed as a composite device:
- *   1. Keyboard (legacy, report ID 1) — types ASCII frames into a focused
+ *   1. Keyboard (standard, report ID 1) — types ASCII frames into a focused
  *      textarea on the kiosk page. Works on any browser, locked-down or not.
  *      Slow (~500 B/s) but the only path that survives without WebHID.
  *   2. Vendor HID (fast path, report ID 6, usage page 0xFF00) — bidirectional
@@ -27,7 +27,7 @@
  *
  * BLE GATT service (UUIDs must match client/tx/ble.py):
  *   Service     4b696f73-6b55-0001-0000-000000000000
- *   TX char     4b696f73-6b55-0002-0000-000000000000  WRITE_NR  (legacy: typed)
+ *   TX char     4b696f73-6b55-0002-0000-000000000000  WRITE_NR  (standard: typed)
  *   CFG char    4b696f73-6b55-0003-0000-000000000000  WRITE     (key delay)
  *   WHID-RX     4b696f73-6b55-0004-0000-000000000000  NOTIFY    (vendor output -> laptop)
  *   WHID-TX     4b696f73-6b55-0005-0000-000000000000  WRITE_NR  (laptop -> vendor input)
@@ -159,7 +159,7 @@ static constexpr size_t VENDOR_REPORT_SIZE = 63;
 // Max Reticulum packet ~500 bytes → HID frame = 1 + 500*2 + 2 + 1 = 1004 bytes.
 static constexpr uint16_t FRAME_MAX   = 1024;
 static constexpr uint8_t  QUEUE_DEPTH =    4;
-// Fast-path vendor-HID queues are sized larger than the legacy keyboard
+// Fast-path vendor-HID queues are sized larger than the standard keyboard
 // frame queue: each entry is one 63-byte report and bursts from the kiosk
 // (4-KB WS message = 67 reports) overrun a tiny queue before the BLE
 // notify or USB IN side can drain it. 128 entries × ~70 bytes ≈ 9 KB total.
@@ -1093,7 +1093,7 @@ void loop() {
     }
 
     // ── Fast-path: drain BLE -> USB Input Reports (laptop -> kiosk) ────────
-    // Bounded number of reports per loop tick so we never starve the legacy
+    // Bounded number of reports per loop tick so we never starve the standard
     // keyboard path or button handling. With WHID_QUEUE_DEPTH=32 we want to
     // be able to drain a full queue across a handful of loop ticks.
     int whidTxBudget = (peerMode == PEER_MODE_WIFI_AP) ? 64 : 16;

@@ -281,7 +281,7 @@ async def test_input_report_forwards_to_websocket(gateway_and_echo, page_with_mo
     await page_with_mock.click("#fast-btn")
     await page_with_mock.wait_for_timeout(150)
 
-    # In legacy mode the page would HDLC-decode WS bytes → render QR.
+    # In standard mode the page would HDLC-decode WS bytes → render QR.
     # In fast mode it forwards them raw, so we send already-HDLC bytes
     # via the mock input report and expect them to come back to the page
     # untouched (since the gateway just echoes them).

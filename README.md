@@ -18,7 +18,7 @@ Typical throughput on the standard path: ~3 kB/s down (QR), ~500 B/s up (HID). E
 |-----------|-------------|
 | [`gateway/`](gateway/README.md)   | Server-side: aiohttp app that serves the kiosk page and splices WebSocket ↔ Reticulum TCP |
 | [`client/`](client/README.md)     | Your-side: desktop app (Mac/Linux/Pi Zero) — webcam QR decode + BLE/HID uplink + Reticulum TCP bridge. `--mode webhid` skips the camera and uses the fast path. |
-| [`firmware/`](firmware/README.md) | ESP32-S3 (M5Stack AtomS3 Lite) composite USB-HID dongle: keyboard (legacy) + vendor-HID (fast path) + BLE GATT |
+| [`firmware/`](firmware/README.md) | ESP32-S3 (M5Stack AtomS3 Lite) composite USB-HID dongle: keyboard (standard) + vendor-HID (fast path) + BLE GATT |
 | `shared/`                         | `framing.py` — HDLC, HID-keyboard frame, QR-fragment, and vendor-HID-report wire formats shared by gateway and client |
 
 See each component's README for setup and usage details.
@@ -43,7 +43,7 @@ Two independent mode axes exist:
                        ↕ WebSocket (binary HDLC stream)
                   kiosk browser             ← navigate here on the kiosk
                   /            \
-   Legacy path                   Fast path (WebHID)
+   Standard path                 Fast path (WebHID)
         ↕                             ↕
    QR animation on canvas        64-byte vendor-HID reports,
    (gateway → laptop, ~3 kB/s)   full duplex, tens of KiB/s
@@ -51,7 +51,7 @@ Two independent mode axes exist:
    webcam captures               ESP32-S3 dongle plugged
    QR codes; OpenCV +            into kiosk USB port —
    zxing-cpp decode              composite HID (keyboard
-        ↕                        for legacy + vendor for fast)
+        ↕                        for standard + vendor for fast)
    client/ (laptop)                    ↕  BLE GATT
                                   client/ (laptop)
                               (in --mode webhid: no camera)
@@ -67,7 +67,7 @@ The gateway is protocol-blind — it splices bytes without knowing anything abou
 
 | Path                                              | Announces | Messaging | NomadNet |
 | ------------------------------------------------- | --------- | --------- | -------- |
-| Laptop + ESP32-S3 dongle (legacy QR + keyboard)   | yes       | yes       | yes      |
+| Laptop + ESP32-S3 dongle (standard QR + keyboard) | yes       | yes       | yes      |
 | Laptop + ESP32-S3 dongle (WebHID fast path)       | yes\*     | yes\*     | yes\*    |
 | Pi Zero USB HID gadget                            | untested  | untested  | untested |
 
